@@ -27,66 +27,88 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "vrs_cv5.h"
+
 
 /** @addtogroup IO_Toggle
   * @{
-  */ 
+  */
 
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
 static __IO uint32_t TimingDelay;
-uint8_t BlinkSpeed = 0;
+uint8_t status = 0;
+char receivedChar;
+char ch[10];
+
+uint8_t pom=0;
 /* Private function prototypes -----------------------------------------------*/
 RCC_ClocksTypeDef RCC_Clocks;
 /* Private functions ---------------------------------------------------------*/
 
-/**
-  * @brief   Main program
-  * @param  None
-  * @retval None
-  */
-int main(void)
-{
-  /*!< At this stage the microcontroller clock setting is already configured, 
-       this is done through SystemInit() function which is called from startup
-       file (startup_stm32l1xx_xl.s) before to branch to application main.
-       To reconfigure the default setting of SystemInit() function, refer to
-       system_stm32l1xx.c file
-     */ 
-  
-  /* SysTick end of count event each 1ms */
-  RCC_GetClocksFreq(&RCC_Clocks);
-  SysTick_Config(RCC_Clocks.HCLK_Frequency / 1000);
-  
-  /* Initialize LED2 */
-  STM_EVAL_LEDInit(LED2);
-  
-  /* Initialize User_Button on STM32NUCLEO */
-  STM_EVAL_PBInit(BUTTON_USER, BUTTON_MODE_EXTI);   
-  
-  /* Initiate Blink Speed variable */ 
-  BlinkSpeed = 0;
-  
-  /* Infinite loop */
-  while (1)
-  {
-    /* Test on blink speed */
-    if(BlinkSpeed == 0)
-    {
-      /*LED2 Toggle each 50ms*/
-      STM_EVAL_LEDToggle(LED2);
-      Delay(50);      
-    }      
-    else if(BlinkSpeed == 1)
-    {
-      STM_EVAL_LEDToggle(LED2);
-      /*LED2 Toggle each 200ms */
-      Delay(200); 
-    }
-  }
+uint32_t value;
+
+int main(void) {
+
+	RCC_GetClocksFreq(&RCC_Clocks);
+	SysTick_Config(RCC_Clocks.HCLK_Frequency / 1000);
+
+	adc_init();
+	NVICInit();
+	UART_init();
+	//enable interrupt
+	ADC_ITConfig(ADC1, ADC_IT_EOC, ENABLE);
+	//enable USART
+	USART_Cmd(USART1, ENABLE);
+
+	USART_puts("init\r");
+	char str[10];
+    //Initialize string to zero
+    memset(str, 0 ,10);
+
+	float voltValue = 0.00;
+	while (1) {
+
+		if (receivedChar == 'm') {
+
+			voltValue = (value * 3.3) / 4096;	//koli debilnym doskam a baudrate
+			sprintf (str, "%.2fV\r", voltValue);
+			receivedChar=0;
+			USART_puts(str);
+		}
+
+	}
 }
+
+
+
+void ADC1_IRQHandler(void){
+	if(ADC1->SR & ADC_SR_EOC){
+		value = ADC1->DR;
+	}
+}
+
+void USART1_IRQHandler(void)
+{
+	if(USART_GetITStatus(USART1, USART_IT_RXNE) != RESET)
+	{
+		USART_ClearITPendingBit(USART1, USART_IT_RXNE);
+		receivedChar = USART_ReceiveData(USART1);
+    }
+}
+
+void USART_puts(volatile char *s){
+
+	while(*s){
+		// wait until data register is empty
+		while( !(USART1->SR & 0x00000040) );
+		USART_SendData(USART1, *s);
+		*s++;
+	}
+}
+
 
 /**
 * @brief  Inserts a delay time.
