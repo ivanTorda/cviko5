@@ -59,6 +59,8 @@ void USART1_IRQHandler(void) {
 	if (USART_GetITStatus(USART1, USART_IT_RXNE) != RESET) {
 		USART_ClearITPendingBit(USART1, USART_IT_RXNE);
 		receivedChar = USART_ReceiveData(USART1);
+	}else if(USART_GetITStatus(USART2, USART_IT_TC) != RESET){
+		USART_ClearITPendingBit(USART2, USART_IT_TC);
 	}
 }
 
